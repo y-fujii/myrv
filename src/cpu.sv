@@ -14,7 +14,7 @@ module Cpu(
 	logic[ 1:0] load_align;
 
 	wire[31:2] inst = bus_data_r[31:2];
-
+	wire[ 4:0] rdi = inst[11: 7];
 	wire[31:0] rs1 = inst[19:15] == 0 ? 0 : regs[inst[19:15]];
 	wire[31:0] rs2 = inst[24:20] == 0 ? 0 : regs[inst[24:20]];
 	wire[31:0] rs2_imm = inst[5] ? rs2 : {{20{inst[31]}}, inst[31:20]};
@@ -86,8 +86,7 @@ module Cpu(
 			bus_addr <= 0;
 			pc <= 0;
 			state <= Execute;
-		end
-		else case (state)
+		end else case (state)
 			Load: begin
 				regs[load_inst[11:7]] <= load_value;
 				bus_addr <= pc + 1;
@@ -102,25 +101,25 @@ module Cpu(
 			end
 			Execute: case (inst[6:2])
 				'b01101: begin // lui
-					regs[inst[11:7]] <= {inst[31:12], 12'b0};
+					regs[rdi] <= {inst[31:12], 12'b0};
 					bus_addr <= pc + 1;
 					pc <= pc + 1;
 					state <= Execute;
 				end
 				'b00101: begin // auipc
-					regs[inst[11:7]] <= addr;
+					regs[rdi] <= addr;
 					bus_addr <= pc + 1;
 					pc <= pc + 1;
 					state <= Execute;
 				end
 				'b00100: begin // op reg reg imm
-					regs[inst[11:7]] <= alu;
+					regs[rdi] <= alu;
 					bus_addr <= pc + 1;
 					pc <= pc + 1;
 					state <= Execute;
 				end
 				'b01100: begin // op reg reg reg
-					regs[inst[11:7]] <= alu;
+					regs[rdi] <= alu;
 					bus_addr <= pc + 1;
 					pc <= pc + 1;
 					state <= Execute;
@@ -144,7 +143,7 @@ module Cpu(
 					state <= Store;
 				end
 				'b11011, 'b11001: begin // jal*
-					regs[inst[11:7]] <= 4 * (pc + 1);
+					regs[rdi] <= 4 * (pc + 1);
 					bus_addr <= addr / 4;
 					pc <= addr / 4;
 					state <= Execute;
@@ -153,17 +152,6 @@ module Cpu(
 					bus_addr <= cmp ? addr / 4 : pc + 1;
 					pc <= cmp ? addr / 4 : pc + 1;
 					state <= Execute;
-				end
-				'b11100: begin
-					if (inst[31:7] == 0) begin
-						$display("a0 = %h", regs[10]);
-						$finish;
-					end
-					else begin
-						bus_addr <= pc + 1;
-						pc <= pc + 1;
-						state <= Execute;
-					end
 				end
 				default: begin
 					bus_addr <= pc + 1;

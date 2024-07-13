@@ -22,9 +22,17 @@ module Test();
 		clock = 0;
 		//forever begin
 		for (int i = 0; i < 65536; ++i) begin
+			#0.5
+			if (cpu.state == cpu.Execute && cpu.inst[31:2] == 'b11100) begin
+				$display("ecall: x10 = %h.", cpu.regs[10]);
+				$finish;
+			end
+			#0.5
+			clock = 1;
 			#1
-			clock = ~clock;
+			clock = 0;
 		end
+		$display("terminated: pc = %h.", cpu.pc);
 		$finish;
 	end
 endmodule
