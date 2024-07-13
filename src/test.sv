@@ -1,43 +1,44 @@
 module Test();
-	bit       clock;
-	bit       reset;
-	bit[31:0] bus_addr;
-	bit[31:0] bus_data_r;
-	bit[31:0] bus_data_w;
-	bit[ 3:0] bus_mask_w;
-	bit       bus_write;
+	logic       clock;
+	logic       reset;
+	logic[31:0] bus_addr;
+	logic[31:0] bus_data_r;
+	logic[31:0] bus_data_w;
+	logic[ 3:0] bus_mask_w;
+	logic       bus_write;
 
 	BRam ram(.clock(~clock), .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w, .bus_write);
 	Cpu  cpu(.clock, .reset, .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w, .bus_write);
 
 	initial begin
+		clock = 0;
+		#0.5
 		reset = 1;
-		#1
+		#0.5
+		clock = 1;
+		#0.5
 		reset = 0;
-		for (int i = 0; i < 6; ++i) begin
+		#0.5
+		clock = 0;
+		//forever begin
+		for (int i = 0; i < 65536; ++i) begin
 			#1
-			clock = 0;
-			#1
-			clock = 1;
-		end
-		#1
-		for (int i = 0; i < 16; ++i) begin
-			$display(ram.mem[i]);
+			clock = ~clock;
 		end
 		$finish;
 	end
 endmodule
 
 module BRam(
-	input  bit       clock,
+	input  logic       clock,
 	// verilator lint_off UNUSEDSIGNAL
-   	input  bit[31:0] bus_addr,
-	output bit[31:0] bus_data_r,
-	input  bit[31:0] bus_data_w,
-	input  bit[ 3:0] bus_mask_w,
-	input  bit       bus_write
+	input  logic[31:0] bus_addr,
+	output logic[31:0] bus_data_r,
+	input  logic[31:0] bus_data_w,
+	input  logic[ 3:0] bus_mask_w,
+	input  logic       bus_write
 );
-	bit[31:0] mem[1023:0];
+	logic[31:0] mem[0:1024];
 
 	initial begin
 		$readmemh("src/mem.hex", mem);
