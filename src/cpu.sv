@@ -58,22 +58,11 @@ module Cpu(
 	);
 	wire[31:0] addr = addr_base + addr_offset;
 
-	wire[ 7:0] load_value_08 = (
-		load_align == 0 ? bus_data_r[ 7: 0] :
-		load_align == 1 ? bus_data_r[15: 8] :
-		load_align == 2 ? bus_data_r[23:16] :
-		load_align == 3 ? bus_data_r[31:24] :
-		'x
-	);
-	wire[15:0] load_value_16 = (
-		load_align == 0 ? bus_data_r[15: 0] :
-		load_align == 2 ? bus_data_r[31:16] :
-		'x
-	);
+	wire[31:0] load_value_s = bus_data_r >> (8 * load_align);
 	wire[31:0] load_value = (
-		load_inst[13:12] == 'b00 ? {load_inst[14] ? 24'b0 : {24{load_value_08[ 7]}}, load_value_08} :
-		load_inst[13:12] == 'b01 ? {load_inst[14] ? 16'b0 : {16{load_value_16[15]}}, load_value_16} :
-		load_inst[13:12] == 'b10 ? bus_data_r :
+		load_inst[13:12] == 'b00 ? {load_inst[14] ? 24'b0 : {24{load_value_s[ 7]}}, load_value_s[ 7:0]} :
+		load_inst[13:12] == 'b01 ? {load_inst[14] ? 16'b0 : {16{load_value_s[15]}}, load_value_s[15:0]} :
+		load_inst[13:12] == 'b10 ? load_value_s :
 		'x
 	);
 
@@ -129,11 +118,11 @@ module Cpu(
 				end
 				'b01000: begin // s*
 					bus_mask_w <= (
-						inst[13:12] == 'b00 ? 'b1  << addr[1:0] :
-						inst[13:12] == 'b01 ? 'b11 << addr[1:0] :
+						inst[13:12] == 'b00 ? 'b1 :
+						inst[13:12] == 'b01 ? 'b11 :
 						inst[13:12] == 'b10 ? 'b1111 :
 						'x
-					);
+					) << addr[1:0];
 					bus_data_w <= rs2 << (8 * addr[1:0]);
 					bus_addr <= addr / 4;
 					state <= Store;
