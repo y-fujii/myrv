@@ -4,8 +4,7 @@ module Cpu(
 	output logic[31:0] bus_addr,
 	input  logic[31:0] bus_data_r,
 	output logic[31:0] bus_data_w,
-	output logic[ 3:0] bus_mask_w,
-	output logic       bus_write
+	output logic[ 3:0] bus_mask_w
 );
 	enum logic[1:0] { Execute, Load, Store } state;
 	logic[31:0] pc;
@@ -82,7 +81,7 @@ module Cpu(
 
 	always_ff @(posedge clock) begin
 		if (reset) begin
-			bus_write <= 0;
+			bus_mask_w <= 0;
 			bus_addr <= 0;
 			pc <= 0;
 			state <= Execute;
@@ -94,7 +93,7 @@ module Cpu(
 				state <= Execute;
 			end
 			Store: begin
-				bus_write <= 0;
+				bus_mask_w <= 0;
 				bus_addr <= pc + 1;
 				pc <= pc + 1;
 				state <= Execute;
@@ -139,7 +138,6 @@ module Cpu(
 					);
 					bus_data_w <= rs2 << (8 * addr[1:0]);
 					bus_addr <= addr / 4;
-					bus_write <= 1;
 					state <= Store;
 				end
 				'b11011, 'b11001: begin // jal*
