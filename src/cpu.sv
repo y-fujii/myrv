@@ -18,25 +18,23 @@ module Cpu(
 	wire[31:0] rs2 = inst[24:20] == 0 ? 0 : regs[inst[24:20]];
 	wire[31:0] rs2_imm = inst[5] ? rs2 : {{20{inst[31]}}, inst[31:20]};
 
+	wire cmp_lts = signed'(rs1) < signed'(rs2_imm);
+	wire cmp_ltu = rs1 < rs2_imm;
+	wire cmp = inst[12] ^ (
+		inst[14:13] == 'b00 ? rs1 == rs2_imm :
+		inst[14:13] == 'b10 ? cmp_lts :
+		inst[14:13] == 'b11 ? cmp_ltu :
+		'x
+	);
 	wire[31:0] alu = (
 		inst[14:12] == 'b000 ? (inst[5] & inst[30] ? rs1 - rs2_imm : rs1 + rs2_imm) :
-		inst[14:12] == 'b010 ? {31'b0, signed'(rs1) < signed'(rs2_imm)} :
-		inst[14:12] == 'b011 ? {31'b0, rs1 < rs2_imm} :
+		inst[14:12] == 'b010 ? {31'b0, cmp_lts} :
+		inst[14:12] == 'b011 ? {31'b0, cmp_ltu} :
 		inst[14:12] == 'b100 ? rs1 ^ rs2_imm :
 		inst[14:12] == 'b110 ? rs1 | rs2_imm :
 		inst[14:12] == 'b111 ? rs1 & rs2_imm :
 		inst[14:12] == 'b001 ? rs1 << rs2_imm[4:0] :
 		inst[14:12] == 'b101 ? 32'(signed'({inst[30] & rs1[31], rs1}) >>> rs2_imm[4:0]) :
-		'x
-	);
-
-	wire cmp = (
-		inst[14:12] == 'b000 ? rs1 == rs2 :
-		inst[14:12] == 'b001 ? rs1 != rs2 :
-		inst[14:12] == 'b100 ? signed'(rs1) <  signed'(rs2) :
-		inst[14:12] == 'b101 ? signed'(rs1) >= signed'(rs2) :
-		inst[14:12] == 'b110 ? rs1 <  rs2 :
-		inst[14:12] == 'b111 ? rs1 >= rs2 :
 		'x
 	);
 
