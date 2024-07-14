@@ -1,10 +1,10 @@
 module Test();
-	logic       clock;
-	logic       reset;
-	logic[31:0] bus_addr;
-	logic[31:0] bus_data_r;
-	logic[31:0] bus_data_w;
-	logic[ 3:0] bus_mask_w;
+	reg        clock;
+	reg        reset;
+	wire[31:0] bus_addr;
+	wire[31:0] bus_data_r;
+	wire[31:0] bus_data_w;
+	wire[ 3:0] bus_mask_w;
 
 	BRam ram(.clock(~clock), .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
 	Cpu  cpu(.clock, .reset, .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
@@ -23,7 +23,10 @@ module Test();
 		for (int i = 0; i < 65536; ++i) begin
 			#0.5
 			if (cpu.state == cpu.Execute && cpu.inst[31:2] == 'b11100) begin
-				$display("ecall: x10 = %h.", cpu.regs[10]);
+				if (cpu.regs[10] == 0)
+					$display("PASS.");
+				else
+					$display("FAIL.");
 				$finish;
 			end
 			#0.5
@@ -31,18 +34,18 @@ module Test();
 			#1
 			clock = 0;
 		end
-		$display("terminated: pc = %h.", cpu.pc);
+		$display("FAIL.", cpu.pc);
 		$finish;
 	end
 endmodule
 
 module BRam(
-	input  logic       clock,
+	input  wire       clock,
 	// verilator lint_off UNUSEDSIGNAL
-	input  logic[31:0] bus_addr,
-	output logic[31:0] bus_data_r,
-	input  logic[31:0] bus_data_w,
-	input  logic[ 3:0] bus_mask_w
+	input  wire[31:0] bus_addr,
+	output reg [31:0] bus_data_r,
+	input  wire[31:0] bus_data_w,
+	input  wire[ 3:0] bus_mask_w
 );
 	logic[31:0] mem[0:1024];
 

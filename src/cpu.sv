@@ -1,16 +1,16 @@
 module Cpu(
-	input  logic       clock,
-	input  logic       reset,
-	output logic[31:0] bus_addr,
-	input  logic[31:0] bus_data_r,
-	output logic[31:0] bus_data_w,
-	output logic[ 3:0] bus_mask_w
+	input  wire       clock,
+	input  wire       reset,
+	output reg [31:0] bus_addr,
+	input  wire[31:0] bus_data_r,
+	output reg [31:0] bus_data_w,
+	output reg [ 3:0] bus_mask_w
 );
-	enum logic[1:0] { Execute, Load, Store } state;
-	logic[31:0] pc;
-	logic[31:0] regs[31:0];
-	logic[14:7] load_inst;
-	logic[ 1:0] load_align;
+	enum reg[1:0] { Execute, Load, Store } state;
+	reg[31:0] pc;
+	reg[31:0] regs[31:0];
+	reg[14:7] load_inst;
+	reg[ 1:0] load_align;
 
 	wire[31:2] inst = bus_data_r[31:2];
 	wire[ 4:0] rdi = inst[11: 7];
@@ -26,7 +26,7 @@ module Cpu(
 		inst[14:12] == 'b110 ? rs1 | rs2_imm :
 		inst[14:12] == 'b111 ? rs1 & rs2_imm :
 		inst[14:12] == 'b001 ? rs1 << rs2_imm[4:0] :
-		inst[14:12] == 'b101 ? (inst[30] ? signed'(signed'(rs1) >>> rs2_imm[4:0]) : rs1 >> rs2_imm[4:0]) :
+		inst[14:12] == 'b101 ? 32'(signed'({inst[30] & rs1[31], rs1}) >>> rs2_imm[4:0]) :
 		'x
 	);
 
