@@ -21,10 +21,9 @@ module Cpu(
 	wire cmp_lts = signed'(rs1) < signed'(rs2_imm);
 	wire cmp_ltu = rs1 < rs2_imm;
 	wire cmp = inst[12] ^ (
-		inst[14:13] == 'b00 ? rs1 == rs2_imm :
 		inst[14:13] == 'b10 ? cmp_lts :
 		inst[14:13] == 'b11 ? cmp_ltu :
-		'x
+		rs1 == rs2_imm
 	);
 	wire[31:0] alu = (
 		inst[14:12] == 'b000 ? (inst[5] & inst[30] ? rs1 - rs2_imm : rs1 + rs2_imm) :
@@ -42,19 +41,14 @@ module Cpu(
 		inst[6:2] == 'b00000 |
 		inst[6:2] == 'b01000 |
 		inst[6:2] == 'b11001 ? rs1 :
-		inst[6:2] == 'b00101 |
-		inst[6:2] == 'b11000 |
-		inst[6:2] == 'b11011 ? 4 * pc :
-		'x
+		4 * pc
 	);
 	wire[31:0] addr_offset = (
-		inst[6:2] == 'b00000 |
-		inst[6:2] == 'b11001 ? {{20{inst[31]}}, inst[31:20]} :
 		inst[6:2] == 'b01000 ? {{20{inst[31]}}, inst[31:25], inst[11:7]} :
 		inst[6:2] == 'b00101 ? {inst[31:12], 12'b0} :
 		inst[6:2] == 'b11000 ? {{20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0} :
 		inst[6:2] == 'b11011 ? {{12{inst[31]}}, inst[19:12], inst[20], inst[30:21], 1'b0} :
-		'x
+		{{20{inst[31]}}, inst[31:20]}
 	);
 	wire[31:0] addr = addr_base + addr_offset;
 
@@ -62,8 +56,7 @@ module Cpu(
 	wire[31:0] load_value = (
 		load_inst[13:12] == 'b00 ? {load_inst[14] ? 24'b0 : {24{load_value_s[ 7]}}, load_value_s[ 7:0]} :
 		load_inst[13:12] == 'b01 ? {load_inst[14] ? 16'b0 : {16{load_value_s[15]}}, load_value_s[15:0]} :
-		load_inst[13:12] == 'b10 ? load_value_s :
-		'x
+		load_value_s
 	);
 
 	always_ff @(posedge clock) begin
@@ -117,12 +110,7 @@ module Cpu(
 					state <= Load;
 				end
 				'b01000: begin // s*
-					bus_mask_w <= (
-						inst[13:12] == 'b00 ? 'b1 :
-						inst[13:12] == 'b01 ? 'b11 :
-						inst[13:12] == 'b10 ? 'b1111 :
-						'x
-					) << addr[1:0];
+					bus_mask_w <= {inst[13], inst[13], inst[13] | inst[12], 1'b1} << addr[1:0];
 					bus_data_w <= rs2 << (8 * addr[1:0]);
 					bus_addr <= addr / 4;
 					state <= Store;
