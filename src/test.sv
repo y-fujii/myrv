@@ -1,7 +1,7 @@
 module Test();
 	reg        clock;
 	reg        reset;
-	wire[31:0] bus_addr;
+	wire[29:0] bus_addr;
 	wire[31:0] bus_data_r;
 	wire[31:0] bus_data_w;
 	wire[ 3:0] bus_mask_w;
@@ -34,7 +34,7 @@ module Test();
 			#1
 			clock = 0;
 		end
-		$display("FAIL.", cpu.pc);
+		$display("FAIL.");
 		$finish;
 	end
 endmodule
@@ -42,18 +42,20 @@ endmodule
 module BRam(
 	input  wire       clock,
 	// verilator lint_off UNUSEDSIGNAL
-	input  wire[31:0] bus_addr,
+	input  wire[29:0] bus_addr,
+	// verilator lint_on  UNUSEDSIGNAL
 	output reg [31:0] bus_data_r,
 	input  wire[31:0] bus_data_w,
 	input  wire[ 3:0] bus_mask_w
 );
-	logic[31:0] mem[0:1024];
+	reg[31:0] mem[0:1024];
 
 	initial begin
 		$readmemh("src/mem.hex", mem);
 	end
 
 	always_ff @(posedge clock) begin
+		// verilator lint_off WIDTHTRUNC
 		if (bus_mask_w[0])
 			mem[bus_addr][ 7: 0] <= bus_data_w[ 7: 0];
 		if (bus_mask_w[1])
@@ -63,5 +65,6 @@ module BRam(
 		if (bus_mask_w[3])
 			mem[bus_addr][31:24] <= bus_data_w[31:24];
 		bus_data_r <= mem[bus_addr];
+		// verilator lint_on  WIDTHTRUNC
 	end
 endmodule

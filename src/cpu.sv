@@ -1,13 +1,13 @@
 module Cpu(
 	input  wire       clock,
 	input  wire       reset,
-	output reg [31:0] bus_addr,
+	output reg [29:0] bus_addr,
 	input  wire[31:0] bus_data_r,
 	output reg [31:0] bus_data_w,
 	output reg [ 3:0] bus_mask_w
 );
 	enum reg[1:0] { Execute, Load, Store } state;
-	reg[31:0] pc;
+	reg[29:0] pc;
 	reg[31:0] regs[31:0];
 	reg[14:7] load_inst;
 	reg[ 1:0] load_align;
@@ -41,7 +41,7 @@ module Cpu(
 		inst[6:2] == 'b00000 |
 		inst[6:2] == 'b01000 |
 		inst[6:2] == 'b11001 ? rs1 :
-		4 * pc
+		{pc, 2'b0}
 	);
 	wire[31:0] addr_offset = (
 		inst[6:2] == 'b01000 ? {{20{inst[31]}}, inst[31:25], inst[11:7]} :
@@ -106,24 +106,24 @@ module Cpu(
 				'b00000: begin // l*
 					load_inst <= inst[14:7];
 					load_align <= addr[1:0];
-					bus_addr <= addr / 4;
+					bus_addr <= addr[31:2];
 					state <= Load;
 				end
 				'b01000: begin // s*
 					bus_mask_w <= {inst[13], inst[13], inst[13] | inst[12], 1'b1} << addr[1:0];
-					bus_data_w <= rs2 << (8 * addr[1:0]);
-					bus_addr <= addr / 4;
+					bus_data_w <= rs2 << {addr[1:0], 3'b0};
+					bus_addr <= addr[31:2];
 					state <= Store;
 				end
 				'b11011, 'b11001: begin // jal*
-					regs[rdi] <= 4 * (pc + 1);
-					bus_addr <= addr / 4;
-					pc <= addr / 4;
+					regs[rdi] <= {pc + 30'b1, 2'b0};
+					bus_addr <= addr[31:2];
+					pc <= addr[31:2];
 					state <= Execute;
 				end
 				'b11000: begin // b*
-					bus_addr <= cmp ? addr / 4 : pc + 1;
-					pc <= cmp ? addr / 4 : pc + 1;
+					bus_addr <= cmp ? addr[31:2] : pc + 1;
+					pc <= cmp ? addr[31:2] : pc + 1;
 					state <= Execute;
 				end
 				default: begin
