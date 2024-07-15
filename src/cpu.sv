@@ -23,8 +23,10 @@ module Cpu(
 	wire cmp = inst[12] ^ (
 		inst[14:13] == 'b10 ? cmp_lts :
 		inst[14:13] == 'b11 ? cmp_ltu :
-		rs1 == rs2_imm
+		inst[14:13] == 'b00 ? rs1 == rs2_imm :
+		'x
 	);
+
 	wire[31:0] alu = (
 		inst[14:12] == 'b000 ? (inst[5] & inst[30] ? rs1 - rs2_imm : rs1 + rs2_imm) :
 		inst[14:12] == 'b010 ? {31'b0, cmp_lts} :
@@ -38,27 +40,35 @@ module Cpu(
 	);
 
 	wire[31:0] addr_base = (
+		inst[6:2] == 'b00101 |
+		inst[6:2] == 'b11011 |
+		inst[6:2] == 'b11000 ? {pc, 2'b0} :
 		inst[6:2] == 'b00000 |
 		inst[6:2] == 'b01000 |
 		inst[6:2] == 'b11001 ? rs1 :
-		{pc, 2'b0}
+		inst[6:2] == 'b01101 ? 0 :
+		'x
 	);
 	wire[31:0] addr_offset = (
-		inst[6:2] == 'b01000 ? {{20{inst[31]}}, inst[31:25], inst[11:7]} :
+		inst[6:2] == 'b01101 |
 		inst[6:2] == 'b00101 ? {inst[31:12], 12'b0} :
-		inst[6:2] == 'b11000 ? {{20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0} :
+		inst[6:2] == 'b00000 |
+		inst[6:2] == 'b11001 ? {{20{inst[31]}}, inst[31:20]} :
+		inst[6:2] == 'b01000 ? {{20{inst[31]}}, inst[31:25], inst[11:7]} :
 		inst[6:2] == 'b11011 ? {{12{inst[31]}}, inst[19:12], inst[20], inst[30:21], 1'b0} :
-		{{20{inst[31]}}, inst[31:20]}
+		inst[6:2] == 'b11000 ? {{20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0} :
+		'x
 	);
 	wire[31:0] addr = addr_base + addr_offset;
 
-	wire[29:0] pc_next = pc + 1;
+	wire[29:0] pc_succ = pc + 1;
 
 	wire[31:0] load_value_s = bus_data_r >> {load_align, 3'b0};
 	wire[31:0] load_value = (
 		load_inst[13:12] == 'b00 ? {load_inst[14] ? 24'b0 : {24{load_value_s[ 7]}}, load_value_s[ 7:0]} :
 		load_inst[13:12] == 'b01 ? {load_inst[14] ? 16'b0 : {16{load_value_s[15]}}, load_value_s[15:0]} :
-		load_value_s
+		load_inst[13:12] == 'b10 ? load_value_s :
+		'x
 	);
 
 	always_ff @(posedge clock) begin
@@ -70,39 +80,27 @@ module Cpu(
 		end else case (state)
 			Load: begin
 				regs[rdi] <= load_value;
-				bus_addr <= pc_next;
-				pc <= pc_next;
+				bus_addr <= pc_succ;
+				pc <= pc_succ;
 				state <= Execute;
 			end
 			Store: begin
 				bus_mask_w <= 0;
-				bus_addr <= pc_next;
-				pc <= pc_next;
+				bus_addr <= pc_succ;
+				pc <= pc_succ;
 				state <= Execute;
 			end
 			Execute: case (inst[6:2])
-				'b01101: begin // lui
-					regs[rdi] <= {inst[31:12], 12'b0};
-					bus_addr <= pc_next;
-					pc <= pc_next;
-					state <= Execute;
-				end
-				'b00101: begin // auipc
+				'b01101, 'b00101: begin // *ui*
 					regs[rdi] <= addr;
-					bus_addr <= pc_next;
-					pc <= pc_next;
+					bus_addr <= pc_succ;
+					pc <= pc_succ;
 					state <= Execute;
 				end
-				'b00100: begin // op reg reg imm
+				'b00100, 'b01100: begin
 					regs[rdi] <= alu;
-					bus_addr <= pc_next;
-					pc <= pc_next;
-					state <= Execute;
-				end
-				'b01100: begin // op reg reg reg
-					regs[rdi] <= alu;
-					bus_addr <= pc_next;
-					pc <= pc_next;
+					bus_addr <= pc_succ;
+					pc <= pc_succ;
 					state <= Execute;
 				end
 				'b00000: begin // l*
@@ -118,19 +116,19 @@ module Cpu(
 					state <= Store;
 				end
 				'b11011, 'b11001: begin // jal*
-					regs[rdi] <= {pc_next, 2'b0};
+					regs[rdi] <= {pc_succ, 2'b0};
 					bus_addr <= addr[31:2];
 					pc <= addr[31:2];
 					state <= Execute;
 				end
 				'b11000: begin // b*
-					bus_addr <= cmp ? addr[31:2] : pc_next;
-					pc <= cmp ? addr[31:2] : pc_next;
+					bus_addr <= cmp ? addr[31:2] : pc_succ;
+					pc <= cmp ? addr[31:2] : pc_succ;
 					state <= Execute;
 				end
 				default: begin
-					bus_addr <= pc_next;
-					pc <= pc_next;
+					bus_addr <= pc_succ;
+					pc <= pc_succ;
 					state <= Execute;
 				end
 			endcase
