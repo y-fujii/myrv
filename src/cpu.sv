@@ -39,26 +39,7 @@ module Cpu(
 		'x
 	);
 
-	wire[31:0] addr_base = (
-		inst[6:2] == 'b00101 |
-		inst[6:2] == 'b11011 |
-		inst[6:2] == 'b11000 ? {pc, 2'b0} :
-		inst[6:2] == 'b00000 |
-		inst[6:2] == 'b01000 |
-		inst[6:2] == 'b11001 ? rs1 :
-		inst[6:2] == 'b01101 ? 0 :
-		'x
-	);
-	wire[31:0] addr_offset = (
-		inst[6:2] == 'b01101 |
-		inst[6:2] == 'b00101 ? {inst[31:12], 12'b0} :
-		inst[6:2] == 'b00000 |
-		inst[6:2] == 'b11001 ? {{20{inst[31]}}, inst[31:20]} :
-		inst[6:2] == 'b01000 ? {{20{inst[31]}}, inst[31:25], inst[11:7]} :
-		inst[6:2] == 'b11011 ? {{12{inst[31]}}, inst[19:12], inst[20], inst[30:21], 1'b0} :
-		inst[6:2] == 'b11000 ? {{20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0} :
-		'x
-	);
+	reg [31:0] addr_base, addr_offset;
 	wire[31:0] addr = addr_base + addr_offset;
 
 	wire[29:0] pc_succ = pc + 1;
@@ -71,63 +52,134 @@ module Cpu(
 		'x
 	);
 
+	always_comb begin
+		if (reset) begin
+			addr_base = 'x;
+			addr_offset = 'x;
+			bus_mask_w = 0;
+			bus_data_w = 'x;
+			bus_addr = 0;
+		end
+		else case (state)
+			Load, Store: begin
+				addr_base = 'x;
+				addr_offset = 'x;
+				bus_mask_w = 0;
+				bus_data_w = 'x;
+				bus_addr = pc_succ;
+			end
+			Execute: case (inst[6:2])
+				'b01101: begin
+					addr_base = 0;
+					addr_offset = {inst[31:12], 12'b0};
+					bus_mask_w = 0;
+					bus_data_w = 'x;
+					bus_addr = pc_succ;
+				end
+				'b00101: begin // *ui*
+					addr_base = {pc, 2'b0};
+					addr_offset = {inst[31:12], 12'b0};
+					bus_mask_w = 0;
+					bus_data_w = 'x;
+					bus_addr = pc_succ;
+				end
+				'b00000: begin // l*
+					addr_base = rs1;
+					addr_offset = {{20{inst[31]}}, inst[31:20]};
+					bus_mask_w = 0;
+					bus_data_w = 'x;
+					bus_addr = addr[31:2];
+				end
+				'b01000: begin // s*
+					addr_base = rs1;
+					addr_offset = {{20{inst[31]}}, inst[31:25], inst[11:7]};
+					bus_mask_w = {inst[13], inst[13], inst[13] | inst[12], 1'b1} << addr[1:0];
+					bus_data_w = rs2 << {addr[1:0], 3'b0};
+					bus_addr = addr[31:2];
+				end
+				'b11011: begin
+					addr_base = {pc, 2'b0};
+					addr_offset = {{12{inst[31]}}, inst[19:12], inst[20], inst[30:21], 1'b0};
+					bus_mask_w = 0;
+					bus_data_w = 'x;
+					bus_addr = addr[31:2];
+				end
+				'b11001: begin // jal*
+					addr_base = rs1;
+					addr_offset = {{20{inst[31]}}, inst[31:20]};
+					bus_mask_w = 0;
+					bus_data_w = 'x;
+					bus_addr = addr[31:2];
+				end
+				'b11000: begin // b*
+					addr_base = {pc, 2'b0};
+					addr_offset = {{20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0};
+					bus_mask_w = 0;
+					bus_data_w = 'x;
+					bus_addr = cmp ? addr[31:2] : pc_succ;
+				end
+				default: begin
+					addr_base = 'x;
+					addr_offset = 'x;
+					bus_mask_w = 0;
+					bus_data_w = 'x;
+					bus_addr = pc_succ;
+				end
+			endcase
+			default: begin
+				addr_base = 'x;
+				addr_offset = 'x;
+				bus_mask_w = 'x;
+				bus_data_w = 'x;
+				bus_addr = 'x;
+			end
+		endcase
+	end
+
 	always_ff @(posedge clock) begin
 		if (reset) begin
-			bus_mask_w <= 0;
-			bus_addr <= 0;
 			pc <= 0;
 			state <= Execute;
-		end else case (state)
+		end
+		else case (state)
 			Load: begin
 				regs[rdi] <= load_value;
-				bus_addr <= pc_succ;
 				pc <= pc_succ;
 				state <= Execute;
 			end
 			Store: begin
-				bus_mask_w <= 0;
-				bus_addr <= pc_succ;
 				pc <= pc_succ;
 				state <= Execute;
 			end
 			Execute: case (inst[6:2])
 				'b01101, 'b00101: begin // *ui*
 					regs[rdi] <= addr;
-					bus_addr <= pc_succ;
 					pc <= pc_succ;
 					state <= Execute;
 				end
 				'b00100, 'b01100: begin
 					regs[rdi] <= alu;
-					bus_addr <= pc_succ;
 					pc <= pc_succ;
 					state <= Execute;
 				end
 				'b00000: begin // l*
 					load_inst <= inst[14:7];
 					load_align <= addr[1:0];
-					bus_addr <= addr[31:2];
 					state <= Load;
 				end
 				'b01000: begin // s*
-					bus_mask_w <= {inst[13], inst[13], inst[13] | inst[12], 1'b1} << addr[1:0];
-					bus_data_w <= rs2 << {addr[1:0], 3'b0};
-					bus_addr <= addr[31:2];
 					state <= Store;
 				end
 				'b11011, 'b11001: begin // jal*
 					regs[rdi] <= {pc_succ, 2'b0};
-					bus_addr <= addr[31:2];
 					pc <= addr[31:2];
 					state <= Execute;
 				end
 				'b11000: begin // b*
-					bus_addr <= cmp ? addr[31:2] : pc_succ;
 					pc <= cmp ? addr[31:2] : pc_succ;
 					state <= Execute;
 				end
 				default: begin
-					bus_addr <= pc_succ;
 					pc <= pc_succ;
 					state <= Execute;
 				end

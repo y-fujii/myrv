@@ -6,7 +6,7 @@ module Test();
 	wire[31:0] bus_data_w;
 	wire[ 3:0] bus_mask_w;
 
-	BRam#(1024) ram(.clock(~clock), .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
+	BRam#(1024) ram(.clock,         .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
 	Cpu         cpu(.clock, .reset, .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
 
 	initial begin

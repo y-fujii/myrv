@@ -7,7 +7,7 @@ YOSYS     := yosys
 lint:
 	$(VERILATOR) --lint-only $(SRCS)
 	$(IVERILOG) $(SRCS)
-	$(YOSYS) -q -p "read_verilog -sv src/cpu.sv"
+	$(YOSYS) -q -p "read_verilog -sv src/cpu.sv; proc"
 
 .PHONY: test
 test: a.out obj_dir/Vtest
