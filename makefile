@@ -23,12 +23,11 @@ test: a.out obj_dir/Vtest
 
 .PHONY: clean
 clean:
-	rm -f a.out
-	rm -rf obj_dir
+	rm -rf a.out obj_dir/
 
 .PHONY: stat
 stat:
-	$(YOSYS) -p "read_verilog -sv src/cpu.sv; synth"
+	$(YOSYS) -p "read_verilog -sv src/cpu.sv; synth; ltp -noff"
 
 .PHONY: timing
 timing:

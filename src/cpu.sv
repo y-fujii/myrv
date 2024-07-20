@@ -3,7 +3,7 @@ module Cpu(
 	input  wire       reset,
 	output reg [29:0] bus_addr,   // comb.
 	input  wire[31:0] bus_data_r,
-	output reg [31:0] bus_data_w, // comb.
+	output wire[31:0] bus_data_w,
 	output reg [ 3:0] bus_mask_w  // comb.
 );
 	enum reg[1:0] { SExec, SLoad, SStore, SX = 'x } state; // dff.
@@ -52,12 +52,13 @@ module Cpu(
 		'x
 	);
 
+	assign bus_data_w = rs2 << {addr[1:0], 3'b0};
+
 	always_comb begin
 		if (reset) begin
 			addr_base = 'x;
 			addr_offset = 'x;
 			bus_mask_w = 0;
-			bus_data_w = 'x;
 			bus_addr = 0;
 		end
 		else unique case (state)
@@ -65,7 +66,6 @@ module Cpu(
 				addr_base = 'x;
 				addr_offset = 'x;
 				bus_mask_w = 0;
-				bus_data_w = 'x;
 				bus_addr = pc_succ;
 			end
 			SExec: unique case (inst[6:2])
@@ -73,56 +73,48 @@ module Cpu(
 					addr_base = 0;
 					addr_offset = {inst[31:12], 12'b0};
 					bus_mask_w = 0;
-					bus_data_w = 'x;
 					bus_addr = pc_succ;
 				end
 				'b00101: begin // auipc.
 					addr_base = {pc, 2'b0};
 					addr_offset = {inst[31:12], 12'b0};
 					bus_mask_w = 0;
-					bus_data_w = 'x;
 					bus_addr = pc_succ;
 				end
 				'b00000: begin // l*.
 					addr_base = rs1;
 					addr_offset = {{20{inst[31]}}, inst[31:20]};
 					bus_mask_w = 0;
-					bus_data_w = 'x;
 					bus_addr = addr[31:2];
 				end
 				'b01000: begin // s*.
 					addr_base = rs1;
 					addr_offset = {{20{inst[31]}}, inst[31:25], inst[11:7]};
 					bus_mask_w = {inst[13], inst[13], inst[13] | inst[12], 1'b1} << addr[1:0];
-					bus_data_w = rs2 << {addr[1:0], 3'b0};
 					bus_addr = addr[31:2];
 				end
 				'b11011: begin // jal.
 					addr_base = {pc, 2'b0};
 					addr_offset = {{12{inst[31]}}, inst[19:12], inst[20], inst[30:21], 1'b0};
 					bus_mask_w = 0;
-					bus_data_w = 'x;
 					bus_addr = addr[31:2];
 				end
 				'b11001: begin // jalr.
 					addr_base = rs1;
 					addr_offset = {{20{inst[31]}}, inst[31:20]};
 					bus_mask_w = 0;
-					bus_data_w = 'x;
 					bus_addr = addr[31:2];
 				end
-				'b11000: begin // b*
+				'b11000: begin // b*.
 					addr_base = {pc, 2'b0};
 					addr_offset = {{20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0};
 					bus_mask_w = 0;
-					bus_data_w = 'x;
 					bus_addr = cmp ? addr[31:2] : pc_succ;
 				end
 				default: begin
 					addr_base = 'x;
 					addr_offset = 'x;
 					bus_mask_w = 0;
-					bus_data_w = 'x;
 					bus_addr = pc_succ;
 				end
 			endcase
@@ -130,7 +122,6 @@ module Cpu(
 				addr_base = 'x;
 				addr_offset = 'x;
 				bus_mask_w = 'x;
-				bus_data_w = 'x;
 				bus_addr = 'x;
 			end
 		endcase
