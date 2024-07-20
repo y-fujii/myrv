@@ -23,7 +23,7 @@ module Test();
 		//forever begin
 		for (int i = 0; i < 65536; ++i) begin
 			#0.5
-			if (cpu.state == cpu.Execute && cpu.inst[31:2] == 'b11100) begin
+			if (cpu.state == cpu.SExec && cpu.inst[31:2] == 'b11100) begin
 				if (cpu.regs[10] == 0)
 					$display("PASS.");
 				else
