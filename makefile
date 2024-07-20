@@ -30,6 +30,10 @@ clean:
 stat:
 	$(YOSYS) -p "read_verilog -sv src/cpu.sv; synth"
 
+.PHONY: timing
+timing:
+	$(YOSYS) -p "read_verilog -sv src/cpu.sv; synth_ice40 -nobram -nocarry; sta"
+
 a.out: $(SRCS)
 	$(IVERILOG) $(SRCS)
 

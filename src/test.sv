@@ -6,8 +6,8 @@ module Test();
 	wire[31:0] bus_data_w;
 	wire[ 3:0] bus_mask_w;
 
-	BRam#(1024) ram(.clock,         .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
-	Cpu         cpu(.clock, .reset, .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
+	Ram#(512) ram(.clock,         .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
+	Cpu       cpu(.clock, .reset, .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
 
 	initial begin
 		clock = 0;
@@ -27,7 +27,7 @@ module Test();
 				if (cpu.regs[10] == 0)
 					$display("PASS.");
 				else
-					$display("FAIL: pc = %h, x10 = %h.", cpu.pc, cpu.regs[10]);
+					$display("FAIL: pc = %h, x10 = %h.", 4 * cpu.pc, cpu.regs[10]);
 				$finish;
 			end
 			#0.5
@@ -35,12 +35,17 @@ module Test();
 			#1
 			clock = 0;
 		end
-		$display("FAIL: pc = %h, x10 = %h.", cpu.pc, cpu.regs[10]);
+		$display("FAIL: pc = %h, x10 = %h.", 4 * cpu.pc, cpu.regs[10]);
 		$finish;
 	end
 endmodule
 
-module BRam#(parameter SIZE)(
+module Ram#(
+	parameter SIZE,
+	// verilator lint_off UNUSEDPARAM
+	parameter TYPE = "block"
+	// verilator lint_on  UNUSEDPARAM
+)(
 	input  wire       clock,
 	// verilator lint_off UNUSEDSIGNAL
 	input  wire[29:0] bus_addr,
@@ -49,7 +54,8 @@ module BRam#(parameter SIZE)(
 	input  wire[31:0] bus_data_w,
 	input  wire[ 3:0] bus_mask_w
 );
-	reg[31:0] mem[0:SIZE]; // should be inferred as a block ram.
+	(* ram_style = TYPE *)
+	reg[31:0] mem[0:SIZE];
 
 	always_ff @(posedge clock) begin
 		// verilator lint_off WIDTHTRUNC
@@ -61,7 +67,10 @@ module BRam#(parameter SIZE)(
 			mem[bus_addr][23:15] <= bus_data_w[23:15];
 		if (bus_mask_w[3])
 			mem[bus_addr][31:24] <= bus_data_w[31:24];
-		bus_data_r <= mem[bus_addr];
+		if (~|bus_mask_w)
+			bus_data_r <= mem[bus_addr];
+		else
+			bus_data_r <= 'x;
 		// verilator lint_on  WIDTHTRUNC
 	end
 endmodule

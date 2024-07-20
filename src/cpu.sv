@@ -60,7 +60,7 @@ module Cpu(
 			bus_data_w = 'x;
 			bus_addr = 0;
 		end
-		else case (state)
+		else unique case (state)
 			SLoad, SStore: begin
 				addr_base = 'x;
 				addr_offset = 'x;
@@ -68,7 +68,7 @@ module Cpu(
 				bus_data_w = 'x;
 				bus_addr = pc_succ;
 			end
-			SExec: case (inst[6:2])
+			SExec: unique case (inst[6:2])
 				'b01101: begin // lui.
 					addr_base = 0;
 					addr_offset = {inst[31:12], 12'b0};
@@ -144,7 +144,7 @@ module Cpu(
 			pc <= 0;
 			state <= SExec;
 		end
-		else case (state)
+		else unique case (state)
 			SLoad: begin
 				regs[rdi] <= load_value;
 				pc <= pc_succ;
@@ -154,7 +154,7 @@ module Cpu(
 				pc <= pc_succ;
 				state <= SExec;
 			end
-			SExec: case (inst[6:2])
+			SExec: unique case (inst[6:2])
 				'b01101, 'b00101: begin // *ui*.
 					regs[rdi] <= addr;
 					pc <= pc_succ;
