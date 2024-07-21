@@ -1,3 +1,4 @@
+(* top *)
 module Test();
 	reg        clock;
 	reg        reset;
@@ -6,8 +7,8 @@ module Test();
 	wire[31:0] bus_data_w;
 	wire[ 3:0] bus_mask_w;
 
-	Ram#(512) ram(.clock,         .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
-	Cpu       cpu(.clock, .reset, .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
+	Ram#(8192) ram(.clock,         .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
+	Cpu        cpu(.clock, .reset, .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
 
 	initial begin
 		clock = 0;
@@ -23,12 +24,12 @@ module Test();
 		//forever begin
 		for (int i = 0; i < 65536; ++i) begin
 			#0.5
-			if (cpu.state == cpu.SExec && cpu.inst[31:2] == 'b11100) begin
+			if (cpu.state[cpu.SExec] && cpu.inst[31:2] == 'b11100) begin
 				if (cpu.regs[10] == 0)
 					$display("PASS.");
 				else
 					$display("FAIL: pc = %h, x10 = %h.", 4 * cpu.pc, cpu.regs[10]);
-				$finish;
+				$finish(0);
 			end
 			#0.5
 			clock = 1;
@@ -36,7 +37,7 @@ module Test();
 			clock = 0;
 		end
 		$display("FAIL: pc = %h, x10 = %h.", 4 * cpu.pc, cpu.regs[10]);
-		$finish;
+		$finish(0);
 	end
 endmodule
 

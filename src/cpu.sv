@@ -6,14 +6,17 @@ module Cpu(
 	output wire[31:0] bus_data_w,
 	output reg [ 3:0] bus_mask_w  // comb.
 );
-	enum reg[1:0] { SExec, SLoad, SStore, SX = 'x } state; // dff.
+	parameter SExec = 0, SWait = 1, SLoad = 2;
+
+	(* onehot *)
+	reg[ 2:0] state;      // dff.
 	reg[29:0] pc;         // dffe.
 	reg[31:0] regs[31:0]; // dffe.
 	reg[14:7] load_inst;  // dff.
 	reg[ 1:0] load_align; // dff.
 
 	wire[31:2] inst = bus_data_r[31:2];
-	wire[ 4:0] rdi = state == SExec ? inst[11: 7] : load_inst[11:7];
+	wire[ 4:0] rdi = state[SExec] ? inst[11: 7] : load_inst[11:7];
 	wire[31:0] rs1 = inst[19:15] == 0 ? 0 : regs[inst[19:15]];
 	wire[31:0] rs2 = inst[24:20] == 0 ? 0 : regs[inst[24:20]];
 	wire[31:0] rs2_imm = inst[5] ? rs2 : {{20{inst[31]}}, inst[31:20]};
@@ -61,14 +64,14 @@ module Cpu(
 			bus_mask_w = 0;
 			bus_addr = 0;
 		end
-		else unique case (state)
-			SLoad, SStore: begin
+		else unique case (1'b1)
+			state[SLoad], state[SWait]: begin
 				addr_base = 'x;
 				addr_offset = 'x;
 				bus_mask_w = 0;
 				bus_addr = pc_succ;
 			end
-			SExec: unique case (inst[6:2])
+			state[SExec]: unique case (inst[6:2])
 				'b01101: begin // lui.
 					addr_base = 0;
 					addr_offset = {inst[31:12], 12'b0};
@@ -133,51 +136,53 @@ module Cpu(
 
 		if (reset) begin
 			pc <= 0;
-			state <= SExec;
+			state <= 1 << SExec;
 		end
-		else unique case (state)
-			SLoad: begin
+		else unique case (1'b1)
+			state[SLoad]: begin
 				regs[rdi] <= load_value;
 				pc <= pc_succ;
-				state <= SExec;
+				state <= 1 << SExec;
 			end
-			SStore: begin
+			state[SWait]: begin
 				pc <= pc_succ;
-				state <= SExec;
+				state <= 1 << SExec;
 			end
-			SExec: unique case (inst[6:2])
+			state[SExec]: unique case (inst[6:2])
 				'b01101, 'b00101: begin // *ui*.
 					regs[rdi] <= addr;
 					pc <= pc_succ;
-					state <= SExec;
+					state <= 1 << SExec;
 				end
 				'b00100, 'b01100: begin
 					regs[rdi] <= alu;
 					pc <= pc_succ;
-					state <= SExec;
+					state <= 1 << SExec;
 				end
 				'b00000: begin // l*.
-					state <= SLoad;
+					state <= 1 << SLoad;
 				end
 				'b01000: begin // s*.
-					state <= SStore;
+					state <= 1 << SWait;
 				end
 				'b11011, 'b11001: begin // jal*.
 					regs[rdi] <= {pc_succ, 2'b0};
 					pc <= addr[31:2];
-					state <= SExec;
+					state <= 1 << SExec;
 				end
 				'b11000: begin // b*.
 					pc <= cmp ? addr[31:2] : pc_succ;
-					state <= SExec;
+					state <= 1 << SExec;
 				end
 				default: begin
 					pc <= pc_succ;
-					state <= SExec;
+					state <= 1 << SExec;
 				end
 			endcase
 			default: begin
-				state <= SX;
+				regs[rdi] <= 'x;
+				pc <= 'x;
+				state <= 'x;
 			end
 		endcase
 	end
