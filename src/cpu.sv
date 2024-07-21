@@ -1,19 +1,19 @@
 module Cpu(
-	input  wire       clock,
-	input  wire       reset,
-	output reg [29:0] bus_addr,   // comb.
-	input  wire[31:0] bus_data_r,
-	output wire[31:0] bus_data_w,
-	output reg [ 3:0] bus_mask_w  // comb.
+	input  logic       clock,
+	input  logic       reset,
+	output logic[29:0] bus_addr,   // comb.
+	input  logic[31:0] bus_data_r,
+	output wire [31:0] bus_data_w,
+	output logic[ 3:0] bus_mask_w  // comb.
 );
-	parameter SExec = 0, SWait = 1, SLoad = 2;
+	localparam SExec = 0, SWait = 1, SLoad = 2;
 
 	(* onehot *)
-	reg[ 2:0] state;      // dff.
-	reg[29:0] pc;         // dffe.
-	reg[31:0] regs[31:0]; // dffe.
-	reg[14:7] load_inst;  // dff.
-	reg[ 1:0] load_align; // dff.
+	logic[ 2:0] state;      // dff.
+	logic[29:0] pc;         // dffe.
+	logic[31:0] regs[31:0]; // dffe.
+	logic[14:7] load_inst;  // dff.
+	logic[ 1:0] load_align; // dff.
 
 	wire[31:2] inst = bus_data_r[31:2];
 	wire[ 4:0] rdi = state[SExec] ? inst[11: 7] : load_inst[11:7];
@@ -42,8 +42,8 @@ module Cpu(
 		'x
 	);
 
-	reg [31:0] addr_base, addr_offset; // comb.
-	wire[31:0] addr = addr_base + addr_offset;
+	logic[31:0] addr_base, addr_offset; // comb.
+	wire [31:0] addr = addr_base + addr_offset;
 
 	wire[29:0] pc_succ = pc + 1;
 
@@ -64,7 +64,7 @@ module Cpu(
 			bus_mask_w = 0;
 			bus_addr = 0;
 		end
-		else unique case (1'b1)
+		else unique case (1)
 			state[SLoad], state[SWait]: begin
 				addr_base = 'x;
 				addr_offset = 'x;
@@ -138,7 +138,7 @@ module Cpu(
 			pc <= 0;
 			state <= 1 << SExec;
 		end
-		else unique case (1'b1)
+		else unique case (1)
 			state[SLoad]: begin
 				regs[rdi] <= load_value;
 				pc <= pc_succ;

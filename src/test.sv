@@ -1,11 +1,11 @@
 (* top *)
 module Test();
-	reg        clock;
-	reg        reset;
-	wire[29:0] bus_addr;
-	wire[31:0] bus_data_r;
-	wire[31:0] bus_data_w;
-	wire[ 3:0] bus_mask_w;
+	logic       clock;
+	logic       reset;
+	wire [29:0] bus_addr;
+	wire [31:0] bus_data_r;
+	wire [31:0] bus_data_w;
+	wire [ 3:0] bus_mask_w;
 
 	Ram#(8192) ram(.clock,         .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
 	Cpu        cpu(.clock, .reset, .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
@@ -47,16 +47,16 @@ module Ram#(
 	parameter TYPE = "block"
 	// verilator lint_on  UNUSEDPARAM
 )(
-	input  wire       clock,
+	input  logic       clock,
 	// verilator lint_off UNUSEDSIGNAL
-	input  wire[29:0] bus_addr,
+	input  logic[29:0] bus_addr,
 	// verilator lint_on  UNUSEDSIGNAL
-	output reg [31:0] bus_data_r,
-	input  wire[31:0] bus_data_w,
-	input  wire[ 3:0] bus_mask_w
+	output logic[31:0] bus_data_r,
+	input  logic[31:0] bus_data_w,
+	input  logic[ 3:0] bus_mask_w
 );
 	(* ram_style = TYPE *)
-	reg[31:0] mem[0:SIZE];
+	logic[31:0] mem[0:SIZE];
 
 	always_ff @(posedge clock) begin
 		// verilator lint_off WIDTHTRUNC
