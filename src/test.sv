@@ -56,7 +56,7 @@ module Ram#(
 	input  logic[ 3:0] bus_mask_w
 );
 	(* ram_style = TYPE *)
-	logic[31:0] mem[0:SIZE];
+	logic[31:0] mem[0:SIZE-1];
 
 	always_ff @(posedge clock) begin
 		// verilator lint_off WIDTHTRUNC
@@ -65,7 +65,7 @@ module Ram#(
 		if (bus_mask_w[1])
 			mem[bus_addr][15: 8] <= bus_data_w[15: 8];
 		if (bus_mask_w[2])
-			mem[bus_addr][23:15] <= bus_data_w[23:15];
+			mem[bus_addr][23:16] <= bus_data_w[23:16];
 		if (bus_mask_w[3])
 			mem[bus_addr][31:24] <= bus_data_w[31:24];
 		if (~|bus_mask_w)
