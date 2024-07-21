@@ -1,35 +1,31 @@
 SRCS      := src/test.sv src/cpu.sv
+
 IVERILOG  := iverilog -g2012 -Wall
 VERILATOR := verilator --quiet --timing -Wall -Wno-DECLFILENAME
 YOSYS     := yosys
+ELF2HEX   := objcopy -O verilog --verilog-data-width=4 --adjust-vma=-0x80000000
 
-.PHONY: lint
+.PHONY: lint test clean stat timing
+
 lint:
 	$(VERILATOR) --lint-only $(SRCS)
 	$(IVERILOG) $(SRCS)
 	$(YOSYS) -q -p "read_verilog -sv src/cpu.sv; proc"
 
-.PHONY: test
 test: a.out obj_dir/Vtest
-	for file in test/*.hex32; do \
-		cp "$$file" src/mem.hex; \
-		echo "v======= $$file =======v"; \
-		echo; \
+	for file in test/*; do \
+		echo; echo "[$$file]"; \
+		$(ELF2HEX) "$$file" src/mem.hex; \
 		./a.out; \
-		echo; \
-		./obj_dir/Vtest; \
-		echo; \
+		./obj_dir/Vtest +verilator+quiet; \
 	done
 
-.PHONY: clean
 clean:
 	rm -rf a.out obj_dir/
 
-.PHONY: stat
 stat:
-	$(YOSYS) -p "read_verilog -sv src/cpu.sv; synth; ltp -noff"
+	$(YOSYS) -p "read_verilog -sv src/cpu.sv; synth -lut 2; ltp -noff"
 
-.PHONY: timing
 timing:
 	$(YOSYS) -p "read_verilog -sv src/cpu.sv; synth_ice40 -nobram -nocarry; sta"
 
