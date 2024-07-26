@@ -1,12 +1,21 @@
 module Cpu(
 	input  logic       clock,
 	input  logic       reset,
-	output logic[29:0] bus_addr,   // comb.
+	output logic[29:0] bus_addr,
 	input  logic[31:0] bus_data_r,
-	output wire [31:0] bus_data_w,
-	output logic[ 3:0] bus_mask_w  // comb.
+	output logic[31:0] bus_data_w,
+	output logic[ 3:0] bus_mask_w
 );
-	localparam SExec = 0, SWait = 1, SLoad = 2;
+	localparam logic[1:0] StExec = 0, StWait = 1, StLoad = 2;
+	localparam logic[4:0] OpLui    = 'b01101;
+	localparam logic[4:0] OpAuipc  = 'b00101;
+	localparam logic[4:0] OpRegImm = 'b00100;
+	localparam logic[4:0] OpRegReg = 'b01100;
+	localparam logic[4:0] OpLoad   = 'b00000;
+	localparam logic[4:0] OpStore  = 'b01000;
+	localparam logic[4:0] OpJal    = 'b11011;
+	localparam logic[4:0] OpJalr   = 'b11001;
+	localparam logic[4:0] OpBranch = 'b11000;
 
 	(* onehot *)
 	logic[ 2:0] state;      // dff.
@@ -16,9 +25,9 @@ module Cpu(
 	logic[ 1:0] load_align; // dff.
 
 	wire[31:2] inst = bus_data_r[31:2];
-	wire[ 4:0] rdi = state[SExec] ? inst[11: 7] : load_inst[11:7];
-	wire[31:0] rs1 = inst[19:15] == 0 ? 0 : regs[inst[19:15]];
-	wire[31:0] rs2 = inst[24:20] == 0 ? 0 : regs[inst[24:20]];
+	wire[ 4:0] rdi = state[StExec] ? inst[11:7] : load_inst[11:7];
+	wire[31:0] rs1 = |inst[19:15] ? regs[inst[19:15]] : 0;
+	wire[31:0] rs2 = |inst[24:20] ? regs[inst[24:20]] : 0;
 	wire[31:0] rs2_imm = inst[5] ? rs2 : {{20{inst[31]}}, inst[31:20]};
 
 	wire cmp_lts = signed'(rs1) < signed'(rs2_imm);
@@ -42,8 +51,27 @@ module Cpu(
 		'x
 	);
 
-	logic[31:0] addr_base, addr_offset; // comb.
-	wire [31:0] addr = addr_base + addr_offset;
+	wire[31:0] addr_reg = (
+		inst[6:2] == OpLoad   |
+		inst[6:2] == OpStore  |
+		inst[6:2] == OpJalr   ? rs1 :
+		inst[6:2] == OpAuipc  |
+		inst[6:2] == OpJal    |
+		inst[6:2] == OpBranch ? {pc, 2'b0} :
+		inst[6:2] == OpLui    ? 0 :
+		'x
+	);
+	wire[31:0] addr_imm = (
+		inst[6:2] == OpLui    |
+		inst[6:2] == OpAuipc  ? {inst[31:12], 12'b0} :
+		inst[6:2] == OpLoad   |
+		inst[6:2] == OpJalr   ? {{20{inst[31]}}, inst[31:20]} :
+		inst[6:2] == OpStore  ? {{20{inst[31]}}, inst[31:25], inst[11:7]} :
+		inst[6:2] == OpJal    ? {{12{inst[31]}}, inst[19:12], inst[20], inst[30:21], 1'b0} :
+		inst[6:2] == OpBranch ? {{20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0} :
+		'x
+	);
+	wire[31:0] addr = addr_reg + addr_imm;
 
 	wire[29:0] pc_succ = pc + 1;
 
@@ -55,135 +83,66 @@ module Cpu(
 		'x
 	);
 
-	assign bus_data_w = rs2 << {addr[1:0], 3'b0};
+	wire is_exec = ~reset & state[StExec];
+	wire[2:0] next_state = (
+		is_exec & inst[6:2] == OpLoad  ? 1 << StLoad :
+		is_exec & inst[6:2] == OpStore ? 1 << StWait :
+		1 << StExec
+	);
 
-	always_comb begin
-		if (reset) begin
-			addr_base = 'x;
-			addr_offset = 'x;
-			bus_mask_w = 0;
-			bus_addr = 0;
-		end
-		else unique case (1)
-			state[SLoad], state[SWait]: begin
-				addr_base = 'x;
-				addr_offset = 'x;
-				bus_mask_w = 0;
-				bus_addr = pc_succ;
-			end
-			state[SExec]: unique case (inst[6:2])
-				'b01101: begin // lui.
-					addr_base = 0;
-					addr_offset = {inst[31:12], 12'b0};
-					bus_mask_w = 0;
-					bus_addr = pc_succ;
-				end
-				'b00101: begin // auipc.
-					addr_base = {pc, 2'b0};
-					addr_offset = {inst[31:12], 12'b0};
-					bus_mask_w = 0;
-					bus_addr = pc_succ;
-				end
-				'b00000: begin // l*.
-					addr_base = rs1;
-					addr_offset = {{20{inst[31]}}, inst[31:20]};
-					bus_mask_w = 0;
-					bus_addr = addr[31:2];
-				end
-				'b01000: begin // s*.
-					addr_base = rs1;
-					addr_offset = {{20{inst[31]}}, inst[31:25], inst[11:7]};
-					bus_mask_w = {inst[13], inst[13], inst[13] | inst[12], 1'b1} << addr[1:0];
-					bus_addr = addr[31:2];
-				end
-				'b11011: begin // jal.
-					addr_base = {pc, 2'b0};
-					addr_offset = {{12{inst[31]}}, inst[19:12], inst[20], inst[30:21], 1'b0};
-					bus_mask_w = 0;
-					bus_addr = addr[31:2];
-				end
-				'b11001: begin // jalr.
-					addr_base = rs1;
-					addr_offset = {{20{inst[31]}}, inst[31:20]};
-					bus_mask_w = 0;
-					bus_addr = addr[31:2];
-				end
-				'b11000: begin // b*.
-					addr_base = {pc, 2'b0};
-					addr_offset = {{20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0};
-					bus_mask_w = 0;
-					bus_addr = cmp ? addr[31:2] : pc_succ;
-				end
-				default: begin
-					addr_base = 'x;
-					addr_offset = 'x;
-					bus_mask_w = 0;
-					bus_addr = pc_succ;
-				end
-			endcase
-			default: begin
-				addr_base = 'x;
-				addr_offset = 'x;
-				bus_mask_w = 'x;
-				bus_addr = 'x;
-			end
-		endcase
-	end
+	assign bus_data_w = rs2 << {addr[1:0], 3'b0};
+	assign bus_mask_w = (
+		is_exec & inst[6:2] == OpStore ? {inst[13], inst[13], inst[13] | inst[12], 1'b1} << addr[1:0] : 0
+	);
+	assign bus_addr = (
+		reset ? 0 :
+		state[StExec] & (
+			 inst[6:2] == OpLoad   |
+			 inst[6:2] == OpStore  |
+			 inst[6:2] == OpJal    |
+			 inst[6:2] == OpJalr   |
+			(inst[6:2] == OpBranch & cmp)
+		) ? addr[31:2] : pc_succ
+	);
 
 	always_ff @(posedge clock) begin
-		load_inst <= inst[14:7];
+		load_inst  <= inst[14:7];
 		load_align <= addr[1:0];
+		state      <= next_state;
 
 		if (reset) begin
 			pc <= 0;
-			state <= 1 << SExec;
 		end
 		else unique case (1)
-			state[SLoad]: begin
+			state[StLoad]: begin
 				regs[rdi] <= load_value;
 				pc <= pc_succ;
-				state <= 1 << SExec;
 			end
-			state[SWait]: begin
+			state[StWait]: begin
 				pc <= pc_succ;
-				state <= 1 << SExec;
 			end
-			state[SExec]: unique case (inst[6:2])
-				'b01101, 'b00101: begin // *ui*.
+			state[StExec]: unique case (inst[6:2])
+				OpLui, OpAuipc: begin
 					regs[rdi] <= addr;
 					pc <= pc_succ;
-					state <= 1 << SExec;
 				end
-				'b00100, 'b01100: begin
+				OpRegImm, OpRegReg: begin
 					regs[rdi] <= alu;
 					pc <= pc_succ;
-					state <= 1 << SExec;
 				end
-				'b00000: begin // l*.
-					state <= 1 << SLoad;
+				OpLoad, OpStore: begin
 				end
-				'b01000: begin // s*.
-					state <= 1 << SWait;
-				end
-				'b11011, 'b11001: begin // jal*.
+				OpJal, OpJalr: begin
 					regs[rdi] <= {pc_succ, 2'b0};
 					pc <= addr[31:2];
-					state <= 1 << SExec;
 				end
-				'b11000: begin // b*.
+				OpBranch: begin
 					pc <= cmp ? addr[31:2] : pc_succ;
-					state <= 1 << SExec;
 				end
 				default: begin
 					pc <= pc_succ;
-					state <= 1 << SExec;
 				end
 			endcase
-			default: begin
-				regs[rdi] <= 'x;
-				pc <= 'x;
-				state <= 'x;
-			end
 		endcase
 	end
 endmodule
