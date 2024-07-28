@@ -12,15 +12,15 @@ module Test();
 
 	initial begin
 		$readmemh("src/mem.hex", ram.mem);
-		clock = 0;
-		reset = 1;
+		clock = 1'b0;
+		reset = 1'b1;
 		#0.5
-		clock = 1;
+		clock = 1'b1;
 		#0.5
-		clock = 0;
-		reset = 0;
+		clock = 1'b0;
+		reset = 1'b0;
 		for (int i = 0; i < 65536; ++i) begin
-			if (cpu.state[cpu.StExec] && cpu.inst[31:2] == 'b11100) begin
+			if (cpu.state[cpu.StExec] && cpu.inst[31:2] == 30'b11100) begin
 				if (cpu.regs[10] == 0)
 					$display("PASS.");
 				else
@@ -28,9 +28,9 @@ module Test();
 				$finish(0);
 			end
 			#0.5
-			clock = 1;
+			clock = 1'b1;
 			#0.5
-			clock = 0;
+			clock = 1'b0;
 		end
 		$display("FAIL: pc = %h, x10 = %h.", 4 * cpu.pc, cpu.regs[10]);
 		$finish(0);
