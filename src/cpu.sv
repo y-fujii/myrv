@@ -33,12 +33,12 @@ module Cpu(
 
 	wire cmp_lts = signed'(rs1) < signed'(rs2_imm);
 	wire cmp_ltu = rs1 < rs2_imm;
-	wire cmp = inst[12] ^ (
+	wire branch = op_branch & (inst[12] ^ (
 		inst[14:13] == 2'b10 ? cmp_lts :
 		inst[14:13] == 2'b11 ? cmp_ltu :
 		inst[14:13] == 2'b00 ? rs1 == rs2_imm :
 		'x
-	);
+	));
 
 	wire[31:0] alu = (
 		inst[14:12] == 3'b000 ? (inst[5] & inst[30] ? rs1 - rs2_imm : rs1 + rs2_imm) :
@@ -68,8 +68,6 @@ module Cpu(
 	);
 	wire[31:0] addr = addr_reg + addr_imm;
 
-	wire[29:0] pc_succ = pc + 30'b1;
-
 	wire[31:0] load_value_s = bus_data_r >> {load_align, 3'b0};
 	wire[31:0] load_value = (
 		load_inst[13:12] == 2'b00 ? {load_inst[14] ? 24'b0 : {24{load_value_s[ 7]}}, load_value_s[ 7:0]} :
@@ -79,10 +77,26 @@ module Cpu(
 	);
 
 	wire is_exec = ~reset & state[StExec];
-	wire[2:0] next_state = (
+	wire[2:0] state_next = (
 		is_exec & op_load  ? 3'b1 << StLoad :
 		is_exec & op_store ? 3'b1 << StWait :
 		3'b1 << StExec
+	);
+
+	wire[29:0] pc_succ = pc + 30'b1;
+	wire[30:0] pc_next = (
+		reset                                       ? {1'b1, 30'b0} :
+		state[StExec] & (op_load | op_store)        ? {1'b0, 30'bx} :
+		state[StExec] & (op_jal | op_jalr | branch) ? {1'b1, addr[31:2]} :
+		{1'b1, pc_succ}
+	);
+
+	wire[32:0] rd_next = (
+		state[StLoad]                           ? {1'b1, load_value} :
+		state[StExec] & (op_lui | op_auipc)     ? {1'b1, addr} :
+		state[StExec] & (op_regimm | op_regreg) ? {1'b1, alu} :
+		state[StExec] & (op_jal | op_jalr)      ? {1'b1, pc_succ, 2'b0} :
+		{1'b0, 32'bx}
 	);
 
 	assign bus_data_w = rs2 << {addr[1:0], 3'b0};
@@ -91,48 +105,17 @@ module Cpu(
 	);
 	assign bus_addr = (
 		reset ? '0 :
-		state[StExec] & (op_load | op_store | op_jal | op_jalr | op_branch & cmp) ? addr[31:2] :
+		state[StExec] & (op_load | op_store | op_jal | op_jalr | branch) ? addr[31:2] :
 		pc_succ
 	);
 
 	always_ff @(posedge clock) begin
-		load_inst  <= inst[14:7];
+		load_inst <= inst[14:7];
 		load_align <= addr[1:0];
-		state      <= next_state;
-
-		if (reset) begin
-			pc <= '0;
-		end
-		else unique case (1'b1)
-			state[StLoad]: begin
-				regs[rdi] <= load_value;
-				pc <= pc_succ;
-			end
-			state[StWait]: begin
-				pc <= pc_succ;
-			end
-			state[StExec]: unique case (1'b1)
-				op_lui | op_auipc: begin
-					regs[rdi] <= addr;
-					pc <= pc_succ;
-				end
-				op_regimm | op_regreg: begin
-					regs[rdi] <= alu;
-					pc <= pc_succ;
-				end
-				op_load | op_store: begin
-				end
-				op_jal | op_jalr: begin
-					regs[rdi] <= {pc_succ, 2'b0};
-					pc <= addr[31:2];
-				end
-				op_branch: begin
-					pc <= cmp ? addr[31:2] : pc_succ;
-				end
-				default: begin
-					pc <= pc_succ;
-				end
-			endcase
-		endcase
+		state <= state_next;
+		if (pc_next[30])
+			pc <= pc_next[29:0];
+		if (rd_next[32])
+			regs[rdi] <= rd_next[31:0];
 	end
 endmodule
