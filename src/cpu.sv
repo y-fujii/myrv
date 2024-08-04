@@ -11,7 +11,7 @@ module Cpu(
 	(* onehot *)
 	logic[ 2:0] state;      // dff.
 	logic[29:0] pc;         // dffe.
-	logic[31:0] regs[31:0]; // dffe.
+	logic[31:0] regs[1:31]; // dffe.
 	logic[14:7] load_inst;  // dff.
 	logic[ 1:0] load_align; // dff.
 
@@ -33,81 +33,89 @@ module Cpu(
 
 	wire cmp_lts = signed'(rs1) < signed'(rs2_imm);
 	wire cmp_ltu = rs1 < rs2_imm;
-	wire branch = op_branch & (inst[12] ^ (
-		inst[14:13] == 2'b10 ? cmp_lts :
-		inst[14:13] == 2'b11 ? cmp_ltu :
-		inst[14:13] == 2'b00 ? rs1 == rs2_imm :
-		'x
-	));
+	logic cmp;
+	always_comb unique case (inst[14:13])
+		2'b10   : cmp = cmp_lts;
+		2'b11   : cmp = cmp_ltu;
+		2'b00   : cmp = rs1 == rs2_imm;
+		default : cmp = 'x;
+	endcase
+	wire branch = op_branch & (inst[12] ^ cmp);
 
-	wire[31:0] alu = (
-		inst[14:12] == 3'b000 ? (inst[5] & inst[30] ? rs1 - rs2_imm : rs1 + rs2_imm) :
-		inst[14:12] == 3'b010 ? {31'b0, cmp_lts} :
-		inst[14:12] == 3'b011 ? {31'b0, cmp_ltu} :
-		inst[14:12] == 3'b100 ? rs1 ^ rs2_imm :
-		inst[14:12] == 3'b110 ? rs1 | rs2_imm :
-		inst[14:12] == 3'b111 ? rs1 & rs2_imm :
-		inst[14:12] == 3'b001 ? rs1 << rs2_imm[4:0] :
-		inst[14:12] == 3'b101 ? 32'(signed'({inst[30] & rs1[31], rs1}) >>> rs2_imm[4:0]) :
-		'x
-	);
+	logic[31:0] alu;
+	always_comb unique case (inst[14:12])
+		3'b000  : alu = inst[5] & inst[30] ? rs1 - rs2_imm : rs1 + rs2_imm;
+		3'b010  : alu = {31'b0, cmp_lts};
+		3'b011  : alu = {31'b0, cmp_ltu};
+		3'b100  : alu = rs1 ^ rs2_imm;
+		3'b110  : alu = rs1 | rs2_imm;
+		3'b111  : alu = rs1 & rs2_imm;
+		3'b001  : alu = rs1 << rs2_imm[4:0];
+		3'b101  : alu = 32'(signed'({inst[30] & rs1[31], rs1}) >>> rs2_imm[4:0]);
+		default : alu = 'x;
+	endcase
 
-	wire[31:0] addr_reg = (
-		op_load | op_store | op_jalr  ? rs1 :
-		op_auipc | op_jal | op_branch ? {pc, 2'b0} :
-		op_lui                        ? '0 :
-		'x
-	);
-	wire[31:0] addr_imm = (
-		op_lui | op_auipc ? {inst[31:12], 12'b0} :
-		op_load | op_jalr ? {{20{inst[31]}}, inst[31:20]} :
-		op_store          ? {{20{inst[31]}}, inst[31:25], inst[11:7]} :
-		op_jal            ? {{12{inst[31]}}, inst[19:12], inst[20], inst[30:21], 1'b0} :
-		op_branch         ? {{20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0} :
-		'x
-	);
-	wire[31:0] addr = addr_reg + addr_imm;
+	logic[31:0] addr_reg;
+	always_comb unique case (1'b1)
+		op_load | op_store | op_jalr  : addr_reg = rs1;
+		op_auipc | op_jal | op_branch : addr_reg = {pc, 2'b0};
+		op_lui                        : addr_reg = '0;
+		default                       : addr_reg = 'x;
+	endcase
+	logic[31:0] addr_imm;
+	always_comb unique case (1'b1)
+		op_lui | op_auipc : addr_imm = {inst[31:12], 12'b0};
+		op_load | op_jalr : addr_imm = {{20{inst[31]}}, inst[31:20]};
+		op_store          : addr_imm = {{20{inst[31]}}, inst[31:25], inst[11:7]};
+		op_jal            : addr_imm = {{12{inst[31]}}, inst[19:12], inst[20], inst[30:21], 1'b0};
+		op_branch         : addr_imm = {{20{inst[31]}}, inst[7], inst[30:25], inst[11:8], 1'b0};
+		default           : addr_imm = 'x;
+	endcase
+	wire [31:0] addr = addr_reg + addr_imm;
 
-	wire[31:0] load_value_s = bus_data_r >> {load_align, 3'b0};
-	wire[31:0] load_value = (
-		load_inst[13:12] == 2'b00 ? {load_inst[14] ? 24'b0 : {24{load_value_s[ 7]}}, load_value_s[ 7:0]} :
-		load_inst[13:12] == 2'b01 ? {load_inst[14] ? 16'b0 : {16{load_value_s[15]}}, load_value_s[15:0]} :
-		load_inst[13:12] == 2'b10 ? load_value_s :
-		'x
-	);
+	wire [31:0] load_value_s = bus_data_r >> {load_align, 3'b0};
+	logic[31:0] load_value;
+	always_comb unique case (load_inst[13:12])
+		2'b00   : load_value = {{24{~load_inst[14] & load_value_s[ 7]}}, load_value_s[ 7:0]};
+		2'b01   : load_value = {{16{~load_inst[14] & load_value_s[15]}}, load_value_s[15:0]};
+		2'b10   : load_value = load_value_s;
+		default : load_value = 'x;
+	endcase
 
 	wire is_exec = ~reset & state[StExec];
-	wire[2:0] state_next = (
-		is_exec & op_load  ? 3'b1 << StLoad :
-		is_exec & op_store ? 3'b1 << StWait :
-		3'b1 << StExec
-	);
+	logic[2:0] state_next;
+	always_comb unique case (1'b1)
+		is_exec & op_load  : state_next = 3'b1 << StLoad;
+		is_exec & op_store : state_next = 3'b1 << StWait;
+		default            : state_next = 3'b1 << StExec;
+	endcase
 
-	wire[29:0] pc_succ = pc + 30'b1;
-	wire[30:0] pc_next = (
-		reset                                       ? {1'b1, 30'b0} :
-		state[StExec] & (op_load | op_store)        ? {1'b0, 30'bx} :
-		state[StExec] & (op_jal | op_jalr | branch) ? {1'b1, addr[31:2]} :
-		{1'b1, pc_succ}
-	);
+	wire [29:0] pc_succ = pc + 30'b1;
+	logic[30:0] pc_next;
+	always_comb unique case (1'b1)
+		reset                                 : pc_next = {1'b1, 30'b0};
+		is_exec & (op_load | op_store)        : pc_next = {1'b0, 30'bx};
+		is_exec & (op_jal | op_jalr | branch) : pc_next = {1'b1, addr[31:2]};
+		default                               : pc_next = {1'b1, pc_succ};
+	endcase
 
-	wire[32:0] rd_next = (
-		state[StLoad]                           ? {1'b1, load_value} :
-		state[StExec] & (op_lui | op_auipc)     ? {1'b1, addr} :
-		state[StExec] & (op_regimm | op_regreg) ? {1'b1, alu} :
-		state[StExec] & (op_jal | op_jalr)      ? {1'b1, pc_succ, 2'b0} :
-		{1'b0, 32'bx}
-	);
+	logic[32:0] rd_next;
+	always_comb unique case (1'b1)
+		state[StLoad]                           : rd_next = {1'b1, load_value};
+		state[StExec] & (op_lui | op_auipc)     : rd_next = {1'b1, addr};
+		state[StExec] & (op_regimm | op_regreg) : rd_next = {1'b1, alu};
+		state[StExec] & (op_jal | op_jalr)      : rd_next = {1'b1, pc_succ, 2'b0};
+		default                                 : rd_next = {1'b0, 32'bx};
+	endcase
 
 	assign bus_data_w = rs2 << {addr[1:0], 3'b0};
-	assign bus_mask_w = (
-		is_exec & op_store ? {inst[13], inst[13], inst[13] | inst[12], 1'b1} << addr[1:0] : '0
-	);
-	assign bus_addr = (
-		reset ? '0 :
-		state[StExec] & (op_load | op_store | op_jal | op_jalr | branch) ? addr[31:2] :
-		pc_succ
-	);
+	assign bus_mask_w = is_exec & op_store ?
+		{inst[13], inst[13], inst[13] | inst[12], 1'b1} << addr[1:0] : '0;
+	always_comb unique case (1'b1)
+		reset                                                      : bus_addr = '0;
+		is_exec & (op_load | op_store | op_jal | op_jalr | branch) : bus_addr = addr[31:2];
+		default                                                    : bus_addr = pc_succ;
+	endcase
 
 	always_ff @(posedge clock) begin
 		load_inst <= inst[14:7];
@@ -115,7 +123,7 @@ module Cpu(
 		state <= state_next;
 		if (pc_next[30])
 			pc <= pc_next[29:0];
-		if (rd_next[32])
+		if (rd_next[32] & |rdi)
 			regs[rdi] <= rd_next[31:0];
 	end
 endmodule
