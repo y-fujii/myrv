@@ -1,3 +1,4 @@
+// (c) Yasuhiro Fujii <http://mimosa-pudica.net>, under MIT License.
 module Cpu(
 	input  logic       clock,
 	input  logic       reset,

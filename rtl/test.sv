@@ -1,4 +1,4 @@
-(* top *)
+// (c) Yasuhiro Fujii <http://mimosa-pudica.net>, under MIT License.
 module Test();
 	logic       clock;
 	logic       reset;
@@ -7,11 +7,10 @@ module Test();
 	logic[31:0] bus_data_w;
 	logic[ 3:0] bus_mask_w;
 
-	Ram#(8192) ram(.clock,         .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
-	Cpu        cpu(.clock, .reset, .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
+	Ram#(8192, "build/mem.hex") ram(.clock,         .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
+	Cpu                         cpu(.clock, .reset, .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
 
 	initial begin
-		$readmemh("src/mem.hex", ram.mem);
 		clock = 1'b0;
 		reset = 1'b1;
 		#0.5
@@ -37,7 +36,7 @@ module Test();
 	end
 endmodule
 
-module Ram#(parameter SIZE)(
+module Ram#(parameter SIZE, parameter FILE)(
 	input  logic       clock,
 	// verilator lint_off UNUSEDSIGNAL
 	input  logic[29:0] bus_addr,
@@ -48,6 +47,8 @@ module Ram#(parameter SIZE)(
 );
 	(* ram_style = "block" *)
 	logic[31:0] mem[0:SIZE-1];
+
+	initial $readmemh(FILE, mem);
 
 	always_ff @(posedge clock) begin
 		// verilator lint_off WIDTHTRUNC
