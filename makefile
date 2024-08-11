@@ -14,7 +14,7 @@ lint:
 	$(YOSYS) -q -p "read_verilog -sv rtl/cpu.sv; prep"
 
 test: build/test_iverilog build/test_verilator/Vtest
-	for file in $$(find $(TEST_DIR)/isa/rv32ui-p-* -executable); do \
+	for file in $$(find $(TEST_DIR)/isa/ -name "rv32ui-p-*" -executable); do \
 		printf "\n[%s]\n" "$$(basename $$file)"; \
 		$(ELF2HEX) "$$file" build/mem.hex; \
 		build/test_iverilog; \

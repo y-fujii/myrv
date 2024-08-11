@@ -110,8 +110,7 @@ module Cpu(
 	endcase
 
 	assign bus_data_w = rs2 << {addr[1:0], 3'b0};
-	assign bus_mask_w = is_exec & op_store ?
-		{inst[13], inst[13], inst[13] | inst[12], 1'b1} << addr[1:0] : '0;
+	assign bus_mask_w = is_exec & op_store ? {{2{inst[13]}}, inst[13] | inst[12], 1'b1} << addr[1:0] : '0;
 	always_comb unique case (1'b1)
 		reset                                                      : bus_addr = '0;
 		is_exec & (op_load | op_store | op_jal | op_jalr | branch) : bus_addr = addr[31:2];

@@ -7,8 +7,10 @@ module Test();
 	logic[31:0] bus_data_w;
 	logic[ 3:0] bus_mask_w;
 
-	Ram#(8192, "build/mem.hex") ram(.clock,         .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
-	Cpu                         cpu(.clock, .reset, .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
+	Ram#(8192, "build/mem.hex")
+	    ram(.clock,         .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
+	(* keep_hierarchy = "true" *)
+	Cpu cpu(.clock, .reset, .bus_addr, .bus_data_r, .bus_data_w, .bus_mask_w);
 
 	initial begin
 		clock = 1'b0;
