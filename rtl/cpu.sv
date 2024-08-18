@@ -2,10 +2,10 @@
 module Cpu(
 	input  logic       clock,
 	input  logic       reset,
-	output logic[29:0] bus_addr,
+	output logic[29:0] bus_addr,   // comb.
 	input  logic[31:0] bus_data_r,
-	output logic[31:0] bus_data_w,
-	output logic[ 3:0] bus_mask_w
+	output logic[31:0] bus_data_w, // comb.
+	output logic[ 3:0] bus_mask_w  // comb.
 );
 	localparam logic[1:0] StExec = 0, StWait = 1, StLoad = 2;
 
@@ -30,7 +30,8 @@ module Cpu(
 	wire[ 4:0] rdi = state[StExec] ? inst[11:7] : load_inst[11:7];
 	wire[31:0] rs1 = |inst[19:15] ? regs[inst[19:15]] : '0;
 	wire[31:0] rs2 = |inst[24:20] ? regs[inst[24:20]] : '0;
-	wire[31:0] rs2_imm = inst[5] ? rs2 : {{20{inst[31]}}, inst[31:20]};
+	//wire[31:0] rs2_imm = inst[5] ? rs2 : {{20{inst[31]}}, inst[31:20]};
+	wire[31:0] rs2_imm = op_regimm ? {{20{inst[31]}}, inst[31:20]} : rs2; // reduce fan-out.
 
 	wire cmp_lts = signed'(rs1) < signed'(rs2_imm);
 	wire cmp_ltu = rs1 < rs2_imm;
@@ -109,8 +110,9 @@ module Cpu(
 		default                                 : rd_next = {1'b0, 32'bx};
 	endcase
 
-	assign bus_data_w = rs2 << {addr[1:0], 3'b0};
-	assign bus_mask_w = is_exec & op_store ? {{2{inst[13]}}, inst[13] | inst[12], 1'b1} << addr[1:0] : '0;
+	always_comb bus_data_w = rs2 << {addr[1:0], 3'b0};
+	always_comb bus_mask_w = is_exec & op_store ?
+		{{2{inst[13]}}, inst[13] | inst[12], 1'b1} << addr[1:0] : '0;
 	always_comb unique case (1'b1)
 		reset                                                      : bus_addr = '0;
 		is_exec & (op_load | op_store | op_jal | op_jalr | branch) : bus_addr = addr[31:2];
