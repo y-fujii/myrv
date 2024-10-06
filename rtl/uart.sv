@@ -12,7 +12,7 @@ module UartTx#(parameter N_CYCLES)(
 
 	always_comb ready = n_bits == 4'b1000;
 
-	always_comb unique casex (n_bits)
+	always_comb unique casez (n_bits)
 		4'b1111 : tx = 1'b0;
 		4'b0??? : tx = data[n_bits[2:0]];
 		default : tx = 1'b1;
