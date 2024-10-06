@@ -1,0 +1,6 @@
+[package]
+name = "baremetal"
+edition = "2021"
+
+[profile.release]
+opt-level = "s"
