@@ -1,4 +1,4 @@
-RTLS      := rtl/test.sv rtl/cpu.sv
+RTLS      := rtl/cpu.sv rtl/ram.sv rtl/test.sv
 TEST_DIR  := ../riscv-tests
 
 IVERILOG  := iverilog -g2012 -Wall
