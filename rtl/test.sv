@@ -40,9 +40,7 @@ endmodule
 
 module Ram#(parameter SIZE, parameter FILE)(
 	input  logic       clock,
-	// verilator lint_off UNUSEDSIGNAL
 	input  logic[29:0] bus_addr,
-	// verilator lint_on  UNUSEDSIGNAL
 	output logic[31:0] bus_data_r,
 	input  logic[31:0] bus_data_w,
 	input  logic[ 3:0] bus_mask_w
@@ -52,20 +50,20 @@ module Ram#(parameter SIZE, parameter FILE)(
 
 	initial $readmemh(FILE, mem);
 
+	wire[$clog2(SIZE)-1:0] phys_addr = $clog2(SIZE)'(bus_addr % 30'(SIZE));
+
 	always_ff @(posedge clock) begin
-		// verilator lint_off WIDTHTRUNC
 		if (bus_mask_w[0])
-			mem[bus_addr][ 7: 0] <= bus_data_w[ 7: 0];
+			mem[phys_addr][ 7: 0] <= bus_data_w[ 7: 0];
 		if (bus_mask_w[1])
-			mem[bus_addr][15: 8] <= bus_data_w[15: 8];
+			mem[phys_addr][15: 8] <= bus_data_w[15: 8];
 		if (bus_mask_w[2])
-			mem[bus_addr][23:16] <= bus_data_w[23:16];
+			mem[phys_addr][23:16] <= bus_data_w[23:16];
 		if (bus_mask_w[3])
-			mem[bus_addr][31:24] <= bus_data_w[31:24];
+			mem[phys_addr][31:24] <= bus_data_w[31:24];
 		if (~|bus_mask_w)
-			bus_data_r <= mem[bus_addr];
+			bus_data_r <= mem[phys_addr];
 		else
 			bus_data_r <= 'x;
-		// verilator lint_on  WIDTHTRUNC
 	end
 endmodule
