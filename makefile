@@ -4,9 +4,9 @@ TEST_DIR  := ../riscv-tests
 IVERILOG  := iverilog -g2012 -Wall
 VERILATOR := verilator --quiet --timing -Wall -Wno-DECLFILENAME
 YOSYS     := yosys
-ELF2HEX   := objcopy -O verilog --verilog-data-width=4 --adjust-vma=-0x80000000
+ELF2HEX   := objcopy -O verilog --verilog-data-width=4
 
-.PHONY: lint test clean ltp sta
+.PHONY: lint test clean ltp sta rust
 
 lint:
 	$(VERILATOR) --lint-only $(RTLS)
@@ -16,7 +16,7 @@ lint:
 test: build/test_iverilog build/test_verilator/Vtest
 	for file in $$(find $(TEST_DIR)/isa/ -name "rv32ui-p-*" -executable); do \
 		printf "\n[%s]\n" "$$(basename $$file)"; \
-		$(ELF2HEX) "$$file" build/mem.hex; \
+		$(ELF2HEX) --adjust-vma=-0x80000000 "$$file" build/mem.hex; \
 		build/test_iverilog; \
 		build/test_verilator/Vtest +verilator+quiet; \
 	done
@@ -29,6 +29,10 @@ ltp:
 
 sta:
 	$(YOSYS) -p "read_verilog -sv rtl/cpu.sv; synth_ice40 -nobram -nocarry; sta"
+
+rust:
+	cd rust && cargo build --release
+	$(ELF2HEX) rust/target/riscv32i-unknown-none-elf/release/baremetal build/mem.hex
 
 build/test_iverilog: $(RTLS)
 	mkdir -p build/
