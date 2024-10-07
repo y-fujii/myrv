@@ -12,11 +12,11 @@ module UartTx#(parameter N_CYCLES)(
 	logic[$clog2(N_CYCLES)-1:0] count;
 
 	always_comb ready = state[10];
-	always_comb tx = |(state & {1'b1, data, 2'b01});
+	always_comb tx = reset | |(state & {1'b1, data, 2'b01});
 
 	always_ff @(posedge clock) begin
 		if (reset | ~|count)
-			count <= N_CYCLES - 1;
+			count <= $size(count)'(N_CYCLES - 1);
 		else
 			count <= count - 1'b1;
 

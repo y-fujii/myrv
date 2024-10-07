@@ -1,20 +1,13 @@
 #![no_std]
 #![no_main]
-use core::*;
-
-arch::global_asm!(r#"
-.global _start
-_start:
-	li sp, 0
-	j main
-"#);
-
-#[panic_handler]
-fn panic(_: &panic::PanicInfo) -> ! {
-    loop {}
-}
+mod entry;
+mod uart;
+use core::fmt::Write;
 
 #[no_mangle]
 fn main() -> ! {
-    loop {}
+    let mut uart = uart::Uart::new(0xc0ffee00usize as _);
+    loop {
+        write!(uart, "Hello world!\r\n").unwrap();
+    }
 }
