@@ -33,8 +33,8 @@ module Cpu(
 	//wire[31:0] rs2_imm = inst[5] ? rs2 : {{20{inst[31]}}, inst[31:20]};
 	wire[31:0] rs2_imm = op_regimm ? {{20{inst[31]}}, inst[31:20]} : rs2; // reduce fan-out.
 
-	wire cmp_lts = signed'(rs1) < signed'(rs2_imm);
 	wire cmp_ltu = rs1 < rs2_imm;
+	wire cmp_lts = (rs1[31] ^ rs2_imm[31]) ^ cmp_ltu;
 	logic cmp;
 	always_comb unique case (inst[14:13])
 		2'b10   : cmp = cmp_lts;

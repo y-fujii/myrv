@@ -25,7 +25,7 @@ module Test();
 				if (cpu.regs[10] == 0)
 					$display("PASS.");
 				else
-					$display("FAIL: pc = %h, x10 = %h.", 4 * cpu.pc, cpu.regs[10]);
+					$display("FAIL: #%0d.", cpu.regs[10] >> 1);
 				$finish(0);
 			end
 			#0.5
@@ -33,7 +33,7 @@ module Test();
 			#0.5
 			clock = 1'b0;
 		end
-		$display("FAIL: pc = %h, x10 = %h.", 4 * cpu.pc, cpu.regs[10]);
+		$display("FAIL: pc = %h.", 4 * cpu.pc);
 		$finish(0);
 	end
 endmodule
