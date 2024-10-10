@@ -2,7 +2,7 @@ RTLS      := rtl/test.sv rtl/ram.sv rtl/cpu.sv
 TEST_DIR  := ../riscv-tests
 
 IVERILOG  := iverilog -g2012 -Wall
-VERILATOR := verilator --quiet --timing -Wall -Wno-DECLFILENAME
+VERILATOR := verilator --quiet --timing -Wall -Wno-DECLFILENAME -Wno-GENUNNAMED
 YOSYS     := yosys
 ELF2HEX   := objcopy -O verilog --verilog-data-width=4
 

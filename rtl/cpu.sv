@@ -30,8 +30,7 @@ module Cpu(
 	wire[ 4:0] rdi = state[StExec] ? inst[11:7] : load_inst[11:7];
 	wire[31:0] rs1 = |inst[19:15] ? regs[inst[19:15]] : '0;
 	wire[31:0] rs2 = |inst[24:20] ? regs[inst[24:20]] : '0;
-	//wire[31:0] rs2_imm = inst[5] ? rs2 : {{20{inst[31]}}, inst[31:20]};
-	wire[31:0] rs2_imm = op_regimm ? {{20{inst[31]}}, inst[31:20]} : rs2; // reduce fan-out.
+	wire[31:0] rs2_imm = op_regimm ? {{20{inst[31]}}, inst[31:20]} : rs2;
 
 	wire cmp_ltu = rs1 < rs2_imm;
 	wire cmp_lts = (rs1[31] ^ rs2_imm[31]) ^ cmp_ltu;
@@ -44,16 +43,23 @@ module Cpu(
 	endcase
 	wire branch = op_branch & (inst[12] ^ cmp);
 
+	logic[31:0] shift_s, shift_l;
+	wire [31:0] shift_r = 32'(signed'({inst[30] & shift_s[31], shift_s}) >>> rs2_imm[4:0]);
+	for (genvar i = 0; i < 32; ++i) begin
+		always_comb shift_s[i] = inst[14] ? rs1[i] : rs1[31 - i];
+		always_comb shift_l[i] = shift_r[31 - i];
+	end
+
 	logic[31:0] alu;
 	always_comb unique case (inst[14:12])
-		3'b000  : alu = inst[5] & inst[30] ? rs1 - rs2_imm : rs1 + rs2_imm;
+		3'b000  : alu = op_regreg & inst[30] ? rs1 - rs2_imm : rs1 + rs2_imm;
 		3'b010  : alu = {31'b0, cmp_lts};
 		3'b011  : alu = {31'b0, cmp_ltu};
 		3'b100  : alu = rs1 ^ rs2_imm;
 		3'b110  : alu = rs1 | rs2_imm;
 		3'b111  : alu = rs1 & rs2_imm;
-		3'b001  : alu = rs1 << rs2_imm[4:0];
-		3'b101  : alu = 32'(signed'({inst[30] & rs1[31], rs1}) >>> rs2_imm[4:0]);
+		3'b001  : alu = shift_l;
+		3'b101  : alu = shift_r;
 		default : alu = 'x;
 	endcase
 
