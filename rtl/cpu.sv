@@ -32,22 +32,23 @@ module Cpu(
 	wire[31:0] rs2 = |inst[24:20] ? regs[inst[24:20]] : '0;
 	wire[31:0] rs2_imm = op_regimm ? {{20{inst[31]}}, inst[31:20]} : rs2;
 
-	wire cmp_ltu = rs1 < rs2_imm;
-	wire cmp_lts = (rs1[31] ^ rs2_imm[31]) ^ cmp_ltu;
-	logic cmp;
+	wire[31:0] cmp_xor = rs1 ^ rs2_imm;
+	wire       cmp_ltu = rs1 < rs2_imm;
+	wire       cmp_lts = cmp_xor[31] ^ cmp_ltu;
+	logic      cmp;
 	always_comb unique case (inst[14:13])
 		2'b10   : cmp = cmp_lts;
 		2'b11   : cmp = cmp_ltu;
-		2'b00   : cmp = rs1 == rs2_imm;
+		2'b00   : cmp = ~|cmp_xor;
 		default : cmp = 'x;
 	endcase
 	wire branch = op_branch & (inst[12] ^ cmp);
 
-	logic[31:0] shift_s, shift_l;
-	wire [31:0] shift_r = 32'(signed'({inst[30] & shift_s[31], shift_s}) >>> rs2_imm[4:0]);
+	logic[31:0] alu_ss, alu_sl;
+	wire [31:0] alu_sr = 32'(signed'({inst[30] & alu_ss[31], alu_ss}) >>> rs2_imm[4:0]);
 	for (genvar i = 0; i < 32; ++i) begin
-		always_comb shift_s[i] = inst[14] ? rs1[i] : rs1[31 - i];
-		always_comb shift_l[i] = shift_r[31 - i];
+		always_comb alu_ss[i] = inst[14] ? rs1[i] : rs1[31 - i];
+		always_comb alu_sl[i] = alu_sr[31 - i];
 	end
 
 	logic[31:0] alu;
@@ -55,11 +56,11 @@ module Cpu(
 		3'b000  : alu = op_regreg & inst[30] ? rs1 - rs2_imm : rs1 + rs2_imm;
 		3'b010  : alu = {31'b0, cmp_lts};
 		3'b011  : alu = {31'b0, cmp_ltu};
-		3'b100  : alu = rs1 ^ rs2_imm;
+		3'b100  : alu = cmp_xor;
 		3'b110  : alu = rs1 | rs2_imm;
 		3'b111  : alu = rs1 & rs2_imm;
-		3'b001  : alu = shift_l;
-		3'b101  : alu = shift_r;
+		3'b001  : alu = alu_sl;
+		3'b101  : alu = alu_sr;
 		default : alu = 'x;
 	endcase
 
