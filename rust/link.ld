@@ -1,4 +1,4 @@
 SECTIONS {
-	.text : { *(.text*) }
-	.rodata : { *(.rodata*) }
+	.text : { *(.text .text.*) }
+	.rodata : { *(.rodata .rodata.*) }
 }

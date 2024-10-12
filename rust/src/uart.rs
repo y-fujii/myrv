@@ -9,7 +9,7 @@ impl Uart {
         Uart { addr: addr }
     }
 
-    pub fn write_byte(&mut self, b: u8) {
+    pub fn write_byte(&self, b: u8) {
         unsafe {
             while ptr::read_volatile(self.addr.add(5)) & (1 << 5) == 0 {}
             ptr::write_volatile(self.addr.add(0), b);
