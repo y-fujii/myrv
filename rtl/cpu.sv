@@ -100,14 +100,6 @@ module Cpu(
 	endcase
 
 	wire [29:0] pc_succ = pc + 30'b1;
-	logic[30:0] pc_next;
-	always_comb unique case (1'b1)
-		reset                                 : pc_next = {1'b1, 30'b0};
-		is_exec & (op_load | op_store)        : pc_next = {1'b0, 30'bx};
-		is_exec & (op_jal | op_jalr | branch) : pc_next = {1'b1, addr[31:2]};
-		default                               : pc_next = {1'b1, pc_succ};
-	endcase
-
 	logic[32:0] rd_next;
 	always_comb unique case (1'b1)
 		state[StLoad]                           : rd_next = {1'b1, load_value};
@@ -117,21 +109,22 @@ module Cpu(
 		default                                 : rd_next = {1'b0, 32'bx};
 	endcase
 
-	always_comb bus_data_w = rs2 << {addr[1:0], 3'b0};
-	always_comb bus_mask_w = is_exec & op_store ?
-		{{2{inst[13]}}, inst[13] | inst[12], 1'b1} << addr[1:0] : '0;
 	always_comb unique case (1'b1)
 		reset                                                      : bus_addr = '0;
 		is_exec & (op_load | op_store | op_jal | op_jalr | branch) : bus_addr = addr[31:2];
 		default                                                    : bus_addr = pc_succ;
 	endcase
 
+	always_comb bus_data_w = rs2_imm << {addr[1:0], 3'b0};
+	always_comb bus_mask_w = is_exec & op_store ?
+		{{2{inst[13]}}, inst[13] | inst[12], 1'b1} << addr[1:0] : '0;
+
 	always_ff @(posedge clock) begin
 		load_inst <= inst[14:7];
 		load_align <= addr[1:0];
 		state <= state_next;
-		if (pc_next[30])
-			pc <= pc_next[29:0];
+		if (!(is_exec & (op_load | op_store)))
+			pc <= bus_addr;
 		if (rd_next[32] & |rdi)
 			regs[rdi] <= rd_next[31:0];
 	end
