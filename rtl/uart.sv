@@ -13,17 +13,19 @@ module UartTx#(parameter N_CYCLES)(
 	always_comb ready = ~reset & state == 11'b1;
 	always_comb tx    =  reset | state[0];
 
+	wire next = count == $size(count)'(N_CYCLES - 1);
+
 	always_ff @(posedge clock) begin
-		if (reset | ~|count)
-			count <= $size(count)'(N_CYCLES - 1);
+		if (reset | next)
+			count <= '0;
 		else
-			count <= count - 'b1;
+			count <= count + 1'b1;
 
 		if (reset)
 			state <= '1;
 		else if (valid & ready)
 			state <= {1'b1, data, 2'b01};
-		else if (~|count & !ready)
-			state <= state >> 1;
+		else if (next & !ready)
+			state <= state >> 1'b1;
 	end
 endmodule

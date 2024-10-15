@@ -19,7 +19,7 @@ fn _start_rust() -> ! {
     unsafe {
         ALLOC = dumb_alloc::Alloc::new(END.as_mut_ptr());
     }
-    crate::main();
+    let _ = crate::main();
     loop {}
 }
 
