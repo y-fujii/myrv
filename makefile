@@ -27,9 +27,6 @@ clean:
 ltp:
 	$(YOSYS) -p "read_verilog -sv rtl/cpu.sv; synth -lut 2; ltp -noff"
 
-sta:
-	$(YOSYS) -p "read_verilog -sv rtl/cpu.sv; synth_ice40 -nobram -nocarry; sta"
-
 rust:
 	cd rust && cargo build --release
 	$(ELF2HEX) rust/target/riscv32i-unknown-none-elf/release/baremetal build/mem.hex
